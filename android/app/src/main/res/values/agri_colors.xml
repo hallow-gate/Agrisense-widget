@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#A9C382</color>
+    <color name="ink">#2A3320</color>
+    <color name="mute">#7D8869</color>
+    <color name="faint">#A7B190</color>
+    <color name="matcha_ink">#34471D</color>
+    <color name="ok">#6F8F45</color>
+    <color name="bad">#B45742</color>
+    <color name="stale">#8C9777</color>
+    <color name="temp">#CF8A52</color>
+    <color name="hum">#6E9EA3</color>
+    <color name="soil">#5F7F3A</color>
+</resources>

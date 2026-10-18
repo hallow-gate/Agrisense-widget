@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="agri_widget_desc">Live temperature, humidity, soil moisture and device status</string>
+    <string name="agri_widget_name">AgriSense</string>
+    <string name="agri_live_channel">Live widget</string>
+    <string name="agri_live_text">Keeping your AgriSense widget live</string>
+</resources>
