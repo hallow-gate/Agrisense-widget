@@ -56,6 +56,7 @@ class MainActivity : FlutterActivity() {
                             result.success(true)
                         } else result.success(false)
                     }
+                    "diagnose" -> result.success(Render.diagnose(this))
                     "widgetCount" -> result.success(Render.widgetIds(this).size)
                     else -> result.notImplemented()
                 }

@@ -130,6 +130,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
+  Future<void> _check() async {
+    String r;
+    try {
+      r = await Api.diagnose();
+    } catch (e) {
+      r = 'Check failed: $e';
+    }
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: C.cardTop,
+        title: Text('Widget check', style: nunito(18, w: FontWeight.w800, color: C.matchaInk)),
+        content: SingleChildScrollView(child: SelectableText(r, style: nunito(13, w: FontWeight.w500, color: C.ink, height: 1.4))),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Close', style: nunito(14, w: FontWeight.w700, color: C.matchaDeep)))],
+      ),
+    );
+  }
+
   Future<void> _pin() async {
     bool done = false;
     try {
@@ -181,7 +200,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           onTap: _openDashboard,
                         ),
                         const SizedBox(height: 16),
-                        _WidgetCard(live: _live, onLive: _toggleLive, onPin: _pin),
+                        _WidgetCard(live: _live, onLive: _toggleLive, onPin: _pin, onCheck: _check),
                         if (_signedIn) ...[
                           const SizedBox(height: 10),
                           Center(
@@ -293,10 +312,11 @@ class _Tile extends StatelessWidget {
 }
 
 class _WidgetCard extends StatelessWidget {
-  const _WidgetCard({required this.live, required this.onLive, required this.onPin});
+  const _WidgetCard({required this.live, required this.onLive, required this.onPin, required this.onCheck});
   final bool live;
   final ValueChanged<bool> onLive;
   final VoidCallback onPin;
+  final VoidCallback onCheck;
 
   @override
   Widget build(BuildContext context) {
@@ -326,6 +346,15 @@ class _WidgetCard extends StatelessWidget {
           const SizedBox(width: 12),
           _Toggle(value: live, onChanged: onLive),
         ]),
+        const SizedBox(height: 6),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: onCheck,
+            style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 32)),
+            child: Text('Check widget', style: nunito(13, w: FontWeight.w700, color: C.matchaDeep)),
+          ),
+        ),
       ]),
     );
   }

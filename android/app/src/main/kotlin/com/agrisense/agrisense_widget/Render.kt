@@ -21,6 +21,26 @@ object Render {
 
     private fun component(c: Context) = ComponentName(c, AgriWidget::class.java)
 
+    /** Inflates every layout exactly like a launcher does and reports the root cause of any failure. */
+    fun diagnose(c: Context): String {
+        val parent = android.widget.FrameLayout(c)
+        val out = StringBuilder()
+        fun root(e: Throwable): String { var t = e; while (t.cause != null) t = t.cause!!; return t.javaClass.simpleName + ": " + t.message }
+        val layouts = listOf("mini" to R.layout.widget_mini, "strip" to R.layout.widget_strip, "wide" to R.layout.widget_wide,
+            "large" to R.layout.widget_large, "stack" to R.layout.widget_stack)
+        for ((n, l) in layouts) {
+            try { RemoteViews(c.packageName, l).apply(c, parent); out.append("layout $n: OK\n") }
+            catch (e: Throwable) { out.append("layout $n: FAIL ${root(e)}\n") }
+        }
+        val mgr = AppWidgetManager.getInstance(c)
+        for (id in mgr.getAppWidgetIds(component(c))) {
+            try { build(c, mgr, id).apply(c, parent); out.append("widget #$id with data: OK\n") }
+            catch (e: Throwable) { out.append("widget #$id with data: FAIL ${root(e)}\n") }
+        }
+        out.append("Android ${android.os.Build.VERSION.SDK_INT}, ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}\n")
+        return out.toString()
+    }
+
     fun widgetIds(c: Context): IntArray =
         AppWidgetManager.getInstance(c).getAppWidgetIds(component(c))
 
@@ -38,14 +58,16 @@ object Render {
     }
 
     // ---- size classes (dp) ----
-    private fun layoutFor(c: Context, mgr: AppWidgetManager, id: Int): Int {
+    private class Size(val layout: Int, val w: Int, val h: Int)
+
+    private fun sizeFor(c: Context, mgr: AppWidgetManager, id: Int): Size {
         val o = mgr.getAppWidgetOptions(id)
         val land = c.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         var w = o.getInt(if (land) AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH else AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
         var h = o.getInt(if (land) AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT else AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0)
         if (w <= 0) w = 250
         if (h <= 0) h = 110
-        return when {
+        val layout = when {
             w >= 200 -> when {
                 h < 80 -> R.layout.widget_strip
                 h < 160 -> R.layout.widget_wide
@@ -54,6 +76,37 @@ object Render {
             h >= 110 -> R.layout.widget_stack
             w >= 110 -> R.layout.widget_strip
             else -> R.layout.widget_mini
+        }
+        return Size(layout, w, h)
+    }
+
+    // Text is sized from the widget's real dimensions (no auto-size, which some launchers refuse to load).
+    private fun fit(wDp: Float, hDp: Float, chars: Int, lo: Float, hi: Float): Float =
+        minOf(hDp * 0.6f, wDp / (chars * 0.62f)).coerceIn(lo, hi)
+
+    private fun sizeText(rv: RemoteViews, sz: Size) {
+        val w = sz.w.toFloat(); val h = sz.h.toFloat()
+        fun set(id: Int, v: Float) = rv.setTextViewTextSize(id, android.util.TypedValue.COMPLEX_UNIT_SP, v)
+        when (sz.layout) {
+            R.layout.widget_mini -> set(R.id.tv_soil, fit(w - 16, h - 40, 4, 12f, 36f))
+            R.layout.widget_strip -> {
+                val v = fit((w - 12) / 3 - 40, h - 16, 5, 9f, 26f)
+                set(R.id.tv_temp, v); set(R.id.tv_hum, v); set(R.id.tv_soil, v)
+            }
+            R.layout.widget_wide -> {
+                val v = fit((w - 20) / 3 - 22, h - 20 - 24 - 4 - 34, 5, 11f, 32f)
+                set(R.id.tv_temp, v); set(R.id.tv_hum, v); set(R.id.tv_soil, v)
+            }
+            R.layout.widget_large -> {
+                set(R.id.tv_soil, fit(w - 44, (h - 24 - 24) * 0.55f - 50, 4, 16f, 46f))
+                val v = fit((w - 24) / 2 - 22, (h - 24 - 24) * 0.45f - 50, 5, 12f, 30f)
+                set(R.id.tv_temp, v); set(R.id.tv_hum, v)
+            }
+            else -> { // stack
+                val rowH = (h - 20 - 24 - 26 - 12) / 3
+                val v = fit((w - 20 - 18 - 24 - 30) , rowH - 8, 5, 11f, 26f)
+                set(R.id.tv_temp, v); set(R.id.tv_hum, v); set(R.id.tv_soil, v)
+            }
         }
     }
 
@@ -130,8 +183,10 @@ object Render {
         if (android.os.Build.VERSION.SDK_INT >= 23) c.getColor(id) else c.resources.getColor(id)
 
     fun build(c: Context, mgr: AppWidgetManager, id: Int): RemoteViews {
-        val rv = RemoteViews(c.packageName, layoutFor(c, mgr, id))
+        val sz = sizeFor(c, mgr, id)
+        val rv = RemoteViews(c.packageName, sz.layout)
         val st = state(c)
+        sizeText(rv, sz)
 
         val tone = when (st.kind) { 0 -> R.color.ok; 1 -> R.color.bad; else -> R.color.stale }
         val dot = when (st.kind) { 0 -> R.drawable.dot_ok; 1 -> R.drawable.dot_bad; else -> R.drawable.dot_stale }
@@ -155,7 +210,7 @@ object Render {
         rv.setInt(R.id.root, "setBackgroundResource", if (st.kind == 1) R.drawable.bg_widget_off else R.drawable.bg_widget)
         rv.setProgressBar(R.id.pb_soil, 100, st.soilPct, false)
         // the big soil figure in the large layout uses the deeper ink
-        if (layoutFor(c, mgr, id) == R.layout.widget_large) rv.setTextColor(R.id.tv_soil, heroColor)
+        if (sz.layout == R.layout.widget_large) rv.setTextColor(R.id.tv_soil, heroColor)
 
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         c.packageManager.getLaunchIntentForPackage(c.packageName)?.let {

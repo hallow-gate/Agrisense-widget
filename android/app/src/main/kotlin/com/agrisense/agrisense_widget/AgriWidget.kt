@@ -27,11 +27,13 @@ class AgriWidget : AppWidgetProvider() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        super.onReceive(context, intent)
-        if (intent.action == Render.ACTION_REFRESH) {
-            if (Store.live(context) && Store.session(context) != null) Live.start(context)
-            syncInBackground(context)
-        }
+        try {
+            super.onReceive(context, intent)
+            if (intent.action == Render.ACTION_REFRESH) {
+                if (Store.live(context) && Store.session(context) != null) Live.start(context)
+                syncInBackground(context)
+            }
+        } catch (e: Exception) { /* a widget must never crash the app */ }
     }
 
     private fun syncInBackground(context: Context) {

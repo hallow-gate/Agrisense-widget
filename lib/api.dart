@@ -158,6 +158,7 @@ class Api {
   // ---- widget helpers ----
   static Future<bool> isLive() async => (await _ch.invokeMethod<bool>('isLive')) ?? true;
   static Future<void> setLive(bool on) => _ch.invokeMethod('setLive', {'on': on});
+  static Future<String> diagnose() async => (await _ch.invokeMethod<String>('diagnose')) ?? 'no result';
   static Future<int> widgetCount() async => (await _ch.invokeMethod<int>('widgetCount')) ?? 0;
   static Future<bool> pinWidget() async => (await _ch.invokeMethod<bool>('pinWidget')) ?? false;
 }
